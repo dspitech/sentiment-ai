@@ -24,3 +24,4 @@ def predict(request: PredictionRequest):
     Analyse le sentiment du texte fourni et retourne un label + score.
     """
     return model.predict(request.text)
+# trigger second build
