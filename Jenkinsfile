@@ -4,6 +4,7 @@ pipeline {
   environment {
     IMAGE_NAME = 'sentiment-ai'
     REGISTRY   = 'ghcr.io/dspitech'
+    REGISTRY_IMAGE = "${REGISTRY}/${IMAGE_NAME}"
   }
 
   stages {
@@ -11,6 +12,9 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+        script {
+          env.IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+        }
       }
     }
 
@@ -35,7 +39,9 @@ pipeline {
 
     stage('Build Docker') {
       steps {
-        sh 'docker build -t sentiment-ai:latest .'
+        sh '''
+          docker build -t sentiment-ai:${IMAGE_TAG} .
+        '''
       }
     }
 
@@ -43,9 +49,29 @@ pipeline {
       steps {
         sh '''
           docker run --rm \
-            sentiment-ai:latest \
-            pytest tests -v || true
+            sentiment-ai:${IMAGE_TAG} \
+            pytest tests -v
         '''
+      }
+    }
+
+    stage('Push to GHCR') {
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'github-token',
+          usernameVariable: 'GITHUB_USER',
+          passwordVariable: 'GITHUB_TOKEN'
+        )]) {
+          sh '''
+            echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
+
+            docker tag sentiment-ai:${IMAGE_TAG} ${REGISTRY_IMAGE}:${IMAGE_TAG}
+            docker tag sentiment-ai:${IMAGE_TAG} ${REGISTRY_IMAGE}:latest
+
+            docker push ${REGISTRY_IMAGE}:${IMAGE_TAG}
+            docker push ${REGISTRY_IMAGE}:latest
+          '''
+        }
       }
     }
 
@@ -53,10 +79,10 @@ pipeline {
 
   post {
     success {
-      echo "Pipeline OK"
+      echo "Pipeline OK - Image pushed: ${REGISTRY_IMAGE}:${IMAGE_TAG}"
     }
     failure {
-      echo "Pipeline FAILED - check logs"
+      echo "Pipeline FAILED"
     }
   }
 }
