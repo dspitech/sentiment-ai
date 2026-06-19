@@ -82,31 +82,35 @@ pipeline {
       }
 
       steps {
-        withSonarQubeEnv(installationName: 'sonarqube') {
-          sh '''
-            # On exécute le scanner en root pour s'assurer qu'il lise tout sans broncher
-            # Mais on loge le working directory dans le /tmp propre au conteneur.
-            docker run --rm \
-              --user root \
-              -v $WORKSPACE:/usr/src \
-              -w /usr/src \
-              -e SONAR_HOST_URL=$SONAR_HOST_URL \
-              -e SONAR_TOKEN=$SONARQUBE_TOKEN \
-              sonarsource/sonar-scanner-cli:latest \
-              sonar-scanner \
-                -Dsonar.projectKey=sentiment-ai \
-                -Dsonar.projectName=SentimentAI \
-                -Dsonar.projectBaseDir=/usr/src \
-                -Dsonar.sources=. \
-                -Dsonar.python.version=3.11 \
-                -Dsonar.python.coverage.reportPaths=coverage.xml \
-                -Dsonar.sourceEncoding=UTF-8
-          '''
+        sh '''
+          # 1. On lance l'analyse SonarQube
+          docker run --rm \
+            --user root \
+            -v $WORKSPACE:/usr/src \
+            -w /usr/src \
+            -e SONAR_HOST_URL=$SONAR_HOST_URL \
+            -e SONAR_TOKEN=$SONARQUBE_TOKEN \
+            sonarsource/sonar-scanner-cli:latest \
+            sonar-scanner \
+              -Dsonar.projectKey=sentiment-ai \
+              -Dsonar.projectName=SentimentAI \
+              -Dsonar.projectBaseDir=/usr/src \
+              -Dsonar.sources=. \
+              -Dsonar.python.version=3.11 \
+              -Dsonar.python.coverage.reportPaths=coverage.xml \
+              -Dsonar.sourceEncoding=UTF-8
+
+          # 2. On interroge directement l'API de SonarQube pour obtenir le statut réel du Quality Gate
+          echo "Vérification du Quality Gate via l'API..."
+          sleep 5
+          STATUS=$(curl -s -u "${SONARQUBE_TOKEN}:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
           
-          timeout(time: 15, unit: 'MINUTES') {
-            waitForQualityGate abortPipeline: true
-          }
-        }
+          echo "Le statut du Quality Gate SonarQube est : $STATUS"
+          if [ "$STATUS" = "ERROR" ]; then
+            echo "Le Quality Gate a échoué !"
+            exit 1
+          fi
+        '''
       }
     }
 
