@@ -37,21 +37,42 @@ pipeline {
       }
     }
 
-    stage('Build Docker') {
+    stage('Build & Test') {
       steps {
         sh '''
-          docker build -t sentiment-ai:${IMAGE_TAG} .
+          IMAGE_NAME=sentiment-ai
+
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+
+          docker rm -f test-runner 2>/dev/null || true
+
+          set +e
+
+          docker run \
+            -e CI=true \
+            --name test-runner \
+            ${IMAGE_NAME}:${IMAGE_TAG} \
+            pytest tests/ -v \
+              --cov=src \
+              --cov-report=xml:/tmp/coverage.xml \
+              --cov-report=term-missing \
+              --cov-fail-under=70
+
+          TEST_EXIT_CODE=$?
+          set -e
+
+          docker cp test-runner:/tmp/coverage.xml ./coverage.xml 2>/dev/null || true
+
+          docker rm -f test-runner 2>/dev/null || true
+
+          exit $TEST_EXIT_CODE
         '''
       }
-    }
 
-    stage('Test') {
-      steps {
-        sh '''
-          docker run --rm \
-            sentiment-ai:${IMAGE_TAG} \
-            pytest tests -v
-        '''
+      post {
+        failure {
+          echo 'Tests échoués ou coverage < 70%'
+        }
       }
     }
 
