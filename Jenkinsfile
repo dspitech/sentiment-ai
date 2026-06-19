@@ -82,7 +82,6 @@ pipeline {
       }
 
       steps {
-        // Syntaxe explicite requise par votre version du plugin
         withSonarQubeEnv(installationName: 'sonarqube') {
           sh '''
             docker run --rm \
@@ -94,7 +93,8 @@ pipeline {
               sonar-scanner \
                 -Dsonar.projectKey=sentiment-ai \
                 -Dsonar.projectName=SentimentAI \
-                -Dsonar.sources=src \
+                -Dsonar.projectBaseDir=/usr/src \
+                -Dsonar.sources=. \
                 -Dsonar.python.version=3.11 \
                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                 -Dsonar.sourceEncoding=UTF-8
