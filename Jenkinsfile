@@ -11,20 +11,25 @@ pipeline {
         stage('3. IaC Validate') { steps { dir('infra') { sh 'docker run --rm -v $(pwd):/terraform -w /terraform hashicorp/terraform:latest init -backend=false && docker run --rm -v $(pwd):/terraform -w /terraform hashicorp/terraform:latest validate' } } }
         stage('4. Build') { steps { sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ." } }
         stage('5. Test') { steps { sh "docker rm -f test-runner 2>/dev/null || true && docker run --name test-runner ${IMAGE_NAME}:${IMAGE_TAG} pytest tests/ -v --cov=. --cov-report=xml:/tmp/coverage.xml --cov-fail-under=70 && docker cp test-runner:/tmp/coverage.xml ./coverage.xml && docker rm -f test-runner" } }
-        stage('6. SonarQube') { 
+        
+        stage('6. SonarQube Analysis') { 
             steps { 
                 sh 'rm -rf ${WORKSPACE}/.scannerwork'
                 withSonarQubeEnv('sonarqube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh """docker run --rm -v ${WORKSPACE}:/usr/src -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner -Dsonar.projectKey=sentiment-ai-new -Dsonar.sources=. -Dsonar.python.coverage.reportPaths=coverage.xml -Dsonar.host.url=\$SONAR_HOST_URL -Dsonar.login=${SONAR_TOKEN}"""
                     }
+                    // Le waitForQualityGate doit être ICI, dans le même bloc withSonarQubeEnv
+                    timeout(time: 15, unit: 'MINUTES') { 
+                        waitForQualityGate abortPipeline: true 
+                    }
                 }
             } 
         }
-        stage('7. Quality Gate') { steps { timeout(time: 15, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } } }
-        stage('8. Security Scan') { steps { sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/trivy aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${IMAGE_NAME}:${IMAGE_TAG}" } }
+
+        stage('7. Security Scan') { steps { sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/trivy aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${IMAGE_NAME}:${IMAGE_TAG}" } }
         
-        stage('9. Push') { 
+        stage('8. Push') { 
             when { branch 'main' }
             steps { 
                 withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) { 
@@ -33,7 +38,7 @@ pipeline {
             } 
         }
         
-        stage('10. IaC Apply') { 
+        stage('9. IaC Apply') { 
             when { branch 'main' }
             steps { 
                 dir('infra') { 
