@@ -41,6 +41,7 @@ DOCKERFILE
 
             docker run --rm \\
               --entrypoint /bin/sh \\
+              -v /var/run/docker.sock:/var/run/docker.sock \\
               -v \${HOME}/.aws:/root/.aws \\
               -e TF_VAR_image_tag=${IMAGE_TAG} \\
               terraform-deploy /terraform/deploy.sh
