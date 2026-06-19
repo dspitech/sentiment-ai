@@ -1,4 +1,3 @@
-# infra/main.tf
 terraform {
   required_providers {
     docker = {
@@ -13,7 +12,7 @@ provider "docker" {
 }
 
 data "docker_network" "cicd" {
-  name = "cicd"
+  name = "cicd-network"
 }
 
 resource "docker_image" "sentiment" {
@@ -39,11 +38,4 @@ resource "docker_container" "sentiment_staging" {
     "ENV=staging",
     "LOG_LEVEL=INFO",
   ]
-
-  healthcheck {
-    test     = ["CMD", "curl", "-f", "http://localhost:8000/health"]
-    interval = "30s"
-    timeout  = "10s"
-    retries  = 3
-  }
 }
