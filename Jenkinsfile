@@ -84,9 +84,7 @@ pipeline {
 
       steps {
         sh '''
-          # On télécharge un binaire sonar-scanner éphémère directement dans l'agent Jenkins 
-          # pour s'affranchir complètement des problèmes de volumes Docker
-          if [ ! -d "$HOME/.sonar/sonar-scanner-cli-5.0.1.3006-linux" ]; then
+          if [ ! -d "$HOME/.sonar/sonar-scanner-5.0.1.3006-linux" ]; then
             echo "Téléchargement du Sonar Scanner natif..."
             mkdir -p $HOME/.sonar
             curl -sSLo $HOME/.sonar/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
@@ -96,7 +94,7 @@ pipeline {
           echo "Exécution du scan natif..."
           $HOME/.sonar/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
             -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.token=$SONARQUBE_TOKEN \
+            -Dsonar.login=$SONARQUBE_TOKEN \
             -Dsonar.projectKey=sentiment-ai \
             -Dsonar.projectName=SentimentAI \
             -Dsonar.sources=src \
