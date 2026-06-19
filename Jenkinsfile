@@ -78,11 +78,26 @@ pipeline {
     
     stage('10. Deploy Terraform') {
       steps {
-        dir('infra') {
-          sh '''
-            docker run --rm -v $(pwd):/terraform -v $HOME/.aws:/root/.aws -w /terraform -e TF_VAR_image_tag=${IMAGE_TAG} hashicorp/terraform:latest init
-            docker run --rm -v $(pwd):/terraform -v $HOME/.aws:/root/.aws -w /terraform -e TF_VAR_image_tag=${IMAGE_TAG} hashicorp/terraform:latest apply -auto-approve
-          '''
+        script {
+          def infraPath = "${env.WORKSPACE}/infra"
+          sh """
+            echo "--- Debug : Listing du dossier ${infraPath} ---"
+            ls -la ${infraPath}
+            
+            docker run --rm \
+              -v ${infraPath}:/terraform \
+              -v \${HOME}/.aws:/root/.aws \
+              -w /terraform \
+              -e TF_VAR_image_tag=${IMAGE_TAG} \
+              hashicorp/terraform:latest init
+              
+            docker run --rm \
+              -v ${infraPath}:/terraform \
+              -v \${HOME}/.aws:/root/.aws \
+              -w /terraform \
+              -e TF_VAR_image_tag=${IMAGE_TAG} \
+              hashicorp/terraform:latest apply -auto-approve
+          """
         }
       }
     }
