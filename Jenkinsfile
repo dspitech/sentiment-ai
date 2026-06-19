@@ -19,25 +19,20 @@ pipeline {
     stage('7. Sonar Analysis') { steps { sh '$HOME/.sonar/bin/sonar-scanner -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_USER_TOKEN -Dsonar.projectKey=sentiment-ai -Dsonar.sources=src -Dsonar.python.coverage.reportPaths=coverage.xml' } }
     stage('8. Quality Gate') { steps { sh 'STATUS=$(curl -s -u "$SONAR_USER_TOKEN:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o \'"status":"[^"]*"\'); if [ "$STATUS" = \'"status":"ERROR"\' ]; then exit 1; fi' } }
     stage('9. Push Image') { steps { sh 'docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_IMAGE}:${IMAGE_TAG} && docker push ${REGISTRY_IMAGE}:${IMAGE_TAG}' } }
-    
+
     stage('10. Deploy Terraform') {
       steps {
         script {
           sh """
             cat > deploy.sh << 'SCRIPT_EOF'
 #!/bin/sh
-# 1. On arrête et supprime le conteneur existant s'il tourne ou existe
 if [ \$(docker ps -aq -f name=sentiment-staging) ]; then
-    echo "Nettoyage : arrêt et suppression du conteneur existant..."
     docker rm -f sentiment-staging
 fi
-
-# 2. On exécute le déploiement Terraform
 terraform init -upgrade
 terraform apply -auto-approve
 SCRIPT_EOF
             chmod +x deploy.sh
-
             docker build -t terraform-deploy -f- . <<DOCKERFILE
 FROM hashicorp/terraform:latest
 COPY infra/ /terraform/
@@ -45,7 +40,6 @@ COPY deploy.sh /terraform/
 RUN rm -f /terraform/terraform.tfstate /terraform/terraform.tfstate.backup /terraform/.terraform.lock.hcl
 WORKDIR /terraform
 DOCKERFILE
-
             docker run --rm \
               --entrypoint /bin/sh \
               -v /var/run/docker.sock:/var/run/docker.sock \
@@ -55,6 +49,28 @@ DOCKERFILE
           """
         }
       }
+    }
+
+    stage('11. Smoke Test') {
+        when { branch 'main' }
+        steps {
+            sh '''
+                echo "Attente démarrage (10s)..."
+                sleep 10
+                curl -f http://localhost:8000/health || exit 1
+                curl -s http://localhost:8000/metrics | grep -q sentiment_predictions_total || exit 1
+                sleep 20
+                curl -s "http://localhost:9090/api/v1/query?query=up{job='sentiment-ai'}" | grep -q '"value":.*1' || exit 1
+                curl -f http://localhost:3000/api/health || exit 1
+                echo "Smoke Test OK : Tous les services sont opérationnels."
+            '''
+        }
+        post {
+            failure {
+                sh 'docker logs prometheus || true'
+                sh 'docker logs sentiment-staging || true'
+            }
+        }
     }
   }
 }
