@@ -26,6 +26,13 @@ pipeline {
           sh """
             cat > deploy.sh << 'SCRIPT_EOF'
 #!/bin/sh
+# 1. On arrête et supprime le conteneur existant s'il tourne ou existe
+if [ \$(docker ps -aq -f name=sentiment-staging) ]; then
+    echo "Nettoyage : arrêt et suppression du conteneur existant..."
+    docker rm -f sentiment-staging
+fi
+
+# 2. On exécute le déploiement Terraform
 terraform init -upgrade
 terraform apply -auto-approve
 SCRIPT_EOF
