@@ -62,9 +62,10 @@ pipeline {
                                 -Dsonar.login=\$SONAR_TOKEN
                         """
                     }
-                    timeout(time: 10, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
-                    }
+                }
+                // ✅ waitForQualityGate HORS du withSonarQubeEnv
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
