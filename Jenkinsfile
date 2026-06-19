@@ -84,7 +84,7 @@ pipeline {
 
       steps {
         sh '''
-          # 1. On lance l'analyse SonarQube avec l'URL explicitement définie
+          # On cible précisément le dossier src pour l'analyse du code
           docker run --rm \
             --user root \
             -v $WORKSPACE:/usr/src \
@@ -96,12 +96,11 @@ pipeline {
               -Dsonar.projectKey=sentiment-ai \
               -Dsonar.projectName=SentimentAI \
               -Dsonar.projectBaseDir=/usr/src \
-              -Dsonar.sources=. \
+              -Dsonar.sources=src \
               -Dsonar.python.version=3.11 \
               -Dsonar.python.coverage.reportPaths=coverage.xml \
               -Dsonar.sourceEncoding=UTF-8
 
-          # 2. On attend 5 secondes et on interroge l'API de SonarQube pour le Quality Gate
           echo "Vérification du Quality Gate via l'API..."
           sleep 5
           STATUS=$(curl -s -u "${SONARQUBE_TOKEN}:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
