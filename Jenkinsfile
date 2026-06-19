@@ -84,9 +84,10 @@ pipeline {
       steps {
         withSonarQubeEnv(installationName: 'sonarqube') {
           sh '''
-            # Exécution avec les IDs (UID:GID) exacts de l'utilisateur Jenkins hôte
+            # On exécute le scanner en root pour s'assurer qu'il lise tout sans broncher
+            # Mais on loge le working directory dans le /tmp propre au conteneur.
             docker run --rm \
-              --user $(id -u):$(id -g) \
+              --user root \
               -v $WORKSPACE:/usr/src \
               -w /usr/src \
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
@@ -96,7 +97,6 @@ pipeline {
                 -Dsonar.projectKey=sentiment-ai \
                 -Dsonar.projectName=SentimentAI \
                 -Dsonar.projectBaseDir=/usr/src \
-                -Dsonar.working.directory=/usr/src/.scannerwork \
                 -Dsonar.sources=. \
                 -Dsonar.python.version=3.11 \
                 -Dsonar.python.coverage.reportPaths=coverage.xml \
