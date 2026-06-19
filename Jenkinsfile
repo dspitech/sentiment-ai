@@ -76,13 +76,14 @@ pipeline {
       }
     }
 
-    stage('SonarQube Analysis') {
+    stage('SonarQube Analysis & Quality Gate') {
       environment {
         SONARQUBE_TOKEN = credentials('sonar-token')
       }
 
       steps {
         withSonarQubeEnv(installationName: 'sonarqube') {
+          // 1. Lancement de l'analyse dans le conteneur
           sh '''
             docker run --rm \
               -v $WORKSPACE:/usr/src \
@@ -99,15 +100,11 @@ pipeline {
                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                 -Dsonar.sourceEncoding=UTF-8
           '''
-        }
-      }
-    }
-
-    stage('Quality Gate') {
-      steps {
-        timeout(time: 15, unit: 'MINUTES') {
-          // Attend le résultat asynchrone du Quality Gate SonarQube via webhook
-          waitForQualityGate abortPipeline: true
+          
+          // 2. On attend le verdict de SonarQube au sein du même wrapper pour préserver le contexte
+          timeout(time: 15, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
+          }
         }
       }
     }
