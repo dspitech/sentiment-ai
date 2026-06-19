@@ -1,4 +1,8 @@
 #!/bin/sh
+for container in sentiment-staging prometheus grafana; do
+    if docker ps -aq -f name="^${container}$" | grep -q .; then
+        docker rm -f "${container}"
+    fi
+done
 terraform init -upgrade
-terraform import docker_network.cicd $(docker network inspect cicd-network --format='{{.Id}}') 2>/dev/null || true
 terraform apply -auto-approve
