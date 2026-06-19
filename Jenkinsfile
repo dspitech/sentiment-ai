@@ -67,18 +67,13 @@ pipeline {
       when { branch 'main' }
       steps {
         dir('infra') {
-          // Utilisation du conteneur Terraform officiel pour éviter d'installer TF sur l'agent
           sh '''
-            docker run --rm -v $(pwd):/terraform -w /terraform \
+            docker run --rm -v $(pwd):/terraform -v $HOME/.aws:/root/.aws -w /terraform \
               -e TF_VAR_image_tag=${IMAGE_TAG} \
-              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
               hashicorp/terraform:latest init
               
-            docker run --rm -v $(pwd):/terraform -w /terraform \
+            docker run --rm -v $(pwd):/terraform -v $HOME/.aws:/root/.aws -w /terraform \
               -e TF_VAR_image_tag=${IMAGE_TAG} \
-              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
               hashicorp/terraform:latest apply -auto-approve
           '''
         }
