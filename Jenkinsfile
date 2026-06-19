@@ -7,6 +7,7 @@ pipeline {
     REGISTRY_IMAGE = "${REGISTRY}/${IMAGE_NAME}"
     SONAR_HOST_URL = 'http://4.223.165.64:9000/'
     SONAR_USER_TOKEN = 'sqa_5e07e6f28100271b73d2b76bcbc49d72e2bc70ee'
+    DOCKER_HOST_IP  = '172.17.0.1'
   }
 
   stages {
@@ -50,14 +51,14 @@ DOCKERFILE
         sh '''
           echo "Attente démarrage (10s)..."
           sleep 10
-          curl -f http://localhost:8001/health || exit 1
+          curl -f http://${DOCKER_HOST_IP}:8001/health || exit 1
           echo "/health OK"
-          curl -s http://localhost:8001/metrics | grep -q sentiment_predictions_total || exit 1
+          curl -s http://${DOCKER_HOST_IP}:8001/metrics | grep -q sentiment_predictions_total || exit 1
           echo "/metrics OK"
           sleep 20
-          curl -s "http://localhost:9090/api/v1/query?query=up{job='sentiment-ai'}" | grep -q '"value":.*1' || exit 1
+          curl -s "http://${DOCKER_HOST_IP}:9090/api/v1/query?query=up{job='sentiment-ai'}" | grep -q '"value":.*1' || exit 1
           echo "Prometheus scrape OK"
-          curl -f http://localhost:3000/api/health || exit 1
+          curl -f http://${DOCKER_HOST_IP}:3000/api/health || exit 1
           echo "Smoke Test OK : Tous les services sont opérationnels."
         '''
       }
