@@ -17,11 +17,15 @@ pipeline {
                 sh 'rm -rf ${WORKSPACE}/.scannerwork'
                 withSonarQubeEnv('sonarqube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh """docker run --rm -v ${WORKSPACE}:/usr/src -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner -Dsonar.projectKey=sentiment-ai-new -Dsonar.sources=. -Dsonar.python.coverage.reportPaths=coverage.xml -Dsonar.host.url=\$SONAR_HOST_URL -Dsonar.login=${SONAR_TOKEN}"""
+                        sh """docker run --rm -v ${WORKSPACE}:/usr/src -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner \
+                            -Dsonar.projectKey=sentiment-ai-new \
+                            -Dsonar.sources=. \
+                            -Dsonar.python.coverage.reportPaths=coverage.xml \
+                            -Dsonar.host.url=\$SONAR_HOST_URL \
+                            -Dsonar.login=${SONAR_TOKEN}"""
                     }
-                    // Le waitForQualityGate doit être ICI, dans le même bloc withSonarQubeEnv
-                    timeout(time: 15, unit: 'MINUTES') { 
-                        waitForQualityGate abortPipeline: true 
+                    timeout(time: 10, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
                     }
                 }
             } 
