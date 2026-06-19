@@ -79,24 +79,17 @@ pipeline {
     stage('10. Deploy Terraform') {
       steps {
         script {
-          def infraPath = "${env.WORKSPACE}/infra"
           sh """
-            echo "--- Debug : Listing du dossier ${infraPath} ---"
-            ls -la ${infraPath}
+            # Création d'une image temporaire embarquant les fichiers infra
+            docker build -t terraform-deploy -f- . <<EOF
+            FROM hashicorp/terraform:latest
+            COPY infra/ /terraform/
+            WORKDIR /terraform
+            EOF
             
-            docker run --rm \
-              -v ${infraPath}:/terraform \
-              -v \${HOME}/.aws:/root/.aws \
-              -w /terraform \
-              -e TF_VAR_image_tag=${IMAGE_TAG} \
-              hashicorp/terraform:latest init
-              
-            docker run --rm \
-              -v ${infraPath}:/terraform \
-              -v \${HOME}/.aws:/root/.aws \
-              -w /terraform \
-              -e TF_VAR_image_tag=${IMAGE_TAG} \
-              hashicorp/terraform:latest apply -auto-approve
+            # Exécution de Terraform sans monter de volume (fichiers inclus dans l'image)
+            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy init
+            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy apply -auto-approve
           """
         }
       }
