@@ -4,6 +4,7 @@ pipeline {
         IMAGE_NAME = "sentiment-ai"
         REGISTRY   = "ghcr.io/dspitech"
         IMAGE_TAG  = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        SONAR_URL  = "http://4.223.165.64:9000"
     }
     stages {
         stage('1. Checkout') {
@@ -48,24 +49,66 @@ pipeline {
         stage('6. SonarQube Analysis') {
             steps {
                 sh 'rm -rf ${WORKSPACE}/.scannerwork'
-                withSonarQubeEnv('sonarqube') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh """
-                            docker run --rm \
-                                -v ${WORKSPACE}:/usr/src \
-                                -w /usr/src \
-                                sonarsource/sonar-scanner-cli:latest sonar-scanner \
-                                -Dsonar.projectKey=sentiment-ai-new \
-                                -Dsonar.sources=. \
-                                -Dsonar.python.coverage.reportPaths=coverage.xml \
-                                -Dsonar.host.url=\$SONAR_HOST_URL \
-                                -Dsonar.login=\$SONAR_TOKEN
-                        """
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    sh """
+                        docker run --rm \
+                            -v ${WORKSPACE}:/usr/src \
+                            -w /usr/src \
+                            sonarsource/sonar-scanner-cli:latest sonar-scanner \
+                            -Dsonar.projectKey=sentiment-ai-new \
+                            -Dsonar.sources=. \
+                            -Dsonar.python.coverage.reportPaths=coverage.xml \
+                            -Dsonar.host.url=${SONAR_URL} \
+                            -Dsonar.login=\$SONAR_TOKEN \
+                            -Dsonar.working.directory=/tmp/.scannerwork
+                    """
+
+                    // Récupérer le task ID depuis le rapport généré dans le workspace
+                    script {
+                        def taskId = sh(
+                            script: "grep ceTaskId ${WORKSPACE}/.sonar/report-task.txt | cut -d= -f2",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "SonarQube task ID: ${taskId}"
+
+                        // Poller jusqu'à ce que le task soit terminé
+                        timeout(time: 10, unit: 'MINUTES') {
+                            waitUntil(initialRecurrencePeriod: 5000) {
+                                def status = sh(
+                                    script: """
+                                        curl -s -u \$SONAR_TOKEN: \
+                                            "${SONAR_URL}/api/ce/task?id=${taskId}" \
+                                            | grep -o '"status":"[^"]*"' \
+                                            | cut -d'"' -f4
+                                    """,
+                                    returnStdout: true
+                                ).trim()
+                                echo "Task status: ${status}"
+                                if (status == 'FAILED' || status == 'CANCELLED') {
+                                    error("SonarQube task ${taskId} ended with status: ${status}")
+                                }
+                                return status == 'SUCCESS'
+                            }
+                        }
+
+                        // Vérifier le Quality Gate
+                        def qgStatus = sh(
+                            script: """
+                                curl -s -u \$SONAR_TOKEN: \
+                                    "${SONAR_URL}/api/qualitygates/project_status?projectKey=sentiment-ai-new" \
+                                    | grep -o '"status":"[^"]*"' \
+                                    | head -1 \
+                                    | cut -d'"' -f4
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Quality Gate status: ${qgStatus}"
+                        if (qgStatus != 'OK') {
+                            error("Quality Gate FAILED: ${qgStatus}. See ${SONAR_URL}/dashboard?id=sentiment-ai-new")
+                        }
                     }
-                }
-                // ✅ waitForQualityGate HORS du withSonarQubeEnv
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
                 }
             }
         }
