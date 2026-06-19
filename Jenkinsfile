@@ -15,7 +15,8 @@ pipeline {
         stage('6. SonarQube Analysis') { 
             steps { 
                 sh 'rm -rf ${WORKSPACE}/.scannerwork'
-                withSonarQubeEnv('sonarqube') {
+                // Le Quality Gate DOIT être encapsulé dans le contexte SonarQube
+                withSonarQubeEnv(name: 'sonarqube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh """docker run --rm -v ${WORKSPACE}:/usr/src -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner \
                             -Dsonar.projectKey=sentiment-ai-new \
