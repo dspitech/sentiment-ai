@@ -16,7 +16,6 @@ pipeline {
                 sh 'rm -rf ${WORKSPACE}/.scannerwork'
                 withSonarQubeEnv('sonarqube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        // Changement de projectKey pour 'sentiment-ai-new' afin de contourner le cache SonarQube
                         sh """docker run --rm -v ${WORKSPACE}:/usr/src -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner -Dsonar.projectKey=sentiment-ai-new -Dsonar.sources=. -Dsonar.python.coverage.reportPaths=coverage.xml -Dsonar.host.url=\$SONAR_HOST_URL -Dsonar.login=${SONAR_TOKEN}"""
                     }
                 }
@@ -24,8 +23,24 @@ pipeline {
         }
         stage('7. Quality Gate') { steps { timeout(time: 15, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } } }
         stage('8. Security Scan') { steps { sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/trivy aquasec/trivy:latest image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${IMAGE_NAME}:${IMAGE_TAG}" } }
-        stage('9. Push') { when { branch 'main' } steps { withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) { sh "echo \$REG_PASS | docker login ghcr.io -u \$REG_USER --password-stdin && docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} && docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" } } }
-        stage('10. IaC Apply') { when { branch 'main' } steps { dir('infra') { sh "docker run --rm -v \$(pwd):/terraform -w /terraform -v /var/run/docker.sock:/var/run/docker.sock -e TF_VAR_image_tag=${IMAGE_TAG} hashicorp/terraform:latest init && docker run --rm -v \$(pwd):/terraform -w /terraform -v /var/run/docker.sock:/var/run/docker.sock -e TF_VAR_image_tag=${IMAGE_TAG} hashicorp/terraform:latest apply -auto-approve" } } }
+        
+        stage('9. Push') { 
+            when { branch 'main' }
+            steps { 
+                withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) { 
+                    sh "echo \$REG_PASS | docker login ghcr.io -u \$REG_USER --password-stdin && docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} && docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" 
+                } 
+            } 
+        }
+        
+        stage('10. IaC Apply') { 
+            when { branch 'main' }
+            steps { 
+                dir('infra') { 
+                    sh "docker run --rm -v \$(pwd):/terraform -w /terraform -v /var/run/docker.sock:/var/run/docker.sock -e TF_VAR_image_tag=${IMAGE_TAG} hashicorp/terraform:latest init && docker run --rm -v \$(pwd):/terraform -w /terraform -v /var/run/docker.sock:/var/run/docker.sock -e TF_VAR_image_tag=${IMAGE_TAG} hashicorp/terraform:latest apply -auto-approve" 
+                } 
+            } 
+        }
     }
     post { always { cleanWs() } }
 }
