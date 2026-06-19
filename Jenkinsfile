@@ -84,30 +84,31 @@ pipeline {
 
       steps {
         sh '''
-          # On laisse le scanner chercher à la racine du montage
-          # mais on ajuste l'analyse sur le dossier courant complet (.)
-          docker run --rm \
-            --user root \
-            -v $WORKSPACE:/usr/src \
-            -w /usr/src \
-            -e SONAR_HOST_URL=$SONAR_HOST_URL \
-            -e SONAR_TOKEN=$SONARQUBE_TOKEN \
-            sonarsource/sonar-scanner-cli:latest \
-            sonar-scanner \
-              -Dsonar.projectKey=sentiment-ai \
-              -Dsonar.projectName=SentimentAI \
-              -Dsonar.projectBaseDir=/usr/src \
-              -Dsonar.sources=. \
-              -Dsonar.exclusions=**/tests/**,**/venv/**,**/.scannerwork/** \
-              -Dsonar.python.version=3.11 \
-              -Dsonar.python.coverage.reportPaths=coverage.xml \
-              -Dsonar.sourceEncoding=UTF-8
+          # On télécharge un binaire sonar-scanner éphémère directement dans l'agent Jenkins 
+          # pour s'affranchir complètement des problèmes de volumes Docker
+          if [ ! -d "$HOME/.sonar/sonar-scanner-cli-5.0.1.3006-linux" ]; then
+            echo "Téléchargement du Sonar Scanner natif..."
+            mkdir -p $HOME/.sonar
+            curl -sSLo $HOME/.sonar/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+            unzip -q -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+          fi
 
-          echo "Vérification du Quality Gate via l'API..."
+          echo "Exécution du scan natif..."
+          $HOME/.sonar/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.token=$SONARQUBE_TOKEN \
+            -Dsonar.projectKey=sentiment-ai \
+            -Dsonar.projectName=SentimentAI \
+            -Dsonar.sources=src \
+            -Dsonar.python.version=3.11 \
+            -Dsonar.python.coverage.reportPaths=coverage.xml \
+            -Dsonar.sourceEncoding=UTF-8
+
+          echo "Vérification du Quality Gate..."
           sleep 5
           STATUS=$(curl -s -u "${SONARQUBE_TOKEN}:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
-          
           echo "Le statut du Quality Gate SonarQube est : $STATUS"
+          
           if [ "$STATUS" = "ERROR" ]; then
             echo "Le Quality Gate a échoué !"
             exit 1
