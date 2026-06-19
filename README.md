@@ -12,3 +12,6 @@ Ce projet utilise un pipeline Jenkins complet automatisé en 8 étapes :
 6. Security Scan (Trivy avec blocage sur CRITICAL/HIGH)
 7. Push to GHCR
 8. Post Actions
+
+## Progression des TP
+- [x] TP 1 à 5 : Terminés
