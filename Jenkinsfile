@@ -84,10 +84,7 @@ pipeline {
       steps {
         withSonarQubeEnv(installationName: 'sonarqube') {
           sh '''
-            # Nettoyage préventif des anciens fichiers créés par root
-            docker run --rm --user root -v $WORKSPACE:/usr/src sonarsource/sonar-scanner-cli:latest rm -rf /usr/src/.scannerwork
-
-            # Exécution avec les IDs (UID:GID) exacts de l'utilisateur Jenkins courant
+            # Exécution avec les IDs (UID:GID) exacts de l'utilisateur Jenkins hôte
             docker run --rm \
               --user $(id -u):$(id -g) \
               -v $WORKSPACE:/usr/src \
