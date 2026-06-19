@@ -24,11 +24,25 @@ pipeline {
       steps {
         script {
           sh """
-            docker build -t terraform-deploy -f Dockerfile.terraform .
-            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy /bin/sh -s <<'END_TF'
-              terraform init -upgrade
-              terraform apply -auto-approve
-END_TF
+            # Création du script de déploiement à la volée
+            cat > deploy.sh << 'SCRIPT_EOF'
+#!/bin/sh
+terraform init -upgrade
+terraform apply -auto-approve
+SCRIPT_EOF
+            chmod +x deploy.sh
+
+            # Construction de l'image dynamique (inclut le script et nettoie les états)
+            docker build -t terraform-deploy -f- . <<DOCKERFILE
+FROM hashicorp/terraform:latest
+COPY infra/ /terraform/
+COPY deploy.sh /terraform/
+RUN rm -f /terraform/terraform.tfstate /terraform/terraform.tfstate.backup /terraform/.terraform.lock.hcl
+WORKDIR /terraform
+DOCKERFILE
+
+            # Exécution propre
+            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy ./deploy.sh
           """
         }
       }
