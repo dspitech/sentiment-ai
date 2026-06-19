@@ -76,6 +76,32 @@ pipeline {
       }
     }
 
+    stage('SonarQube Analysis') {
+      environment {
+        SONARQUBE_TOKEN = credentials('sonar-token')
+      }
+
+      steps {
+        withSonarQubeEnv('sonarqube') {
+          sh '''
+            docker run --rm \
+              -v $WORKSPACE:/usr/src \
+              -w /usr/src \
+              -e SONAR_HOST_URL=$SONAR_HOST_URL \
+              -e SONAR_TOKEN=$SONARQUBE_TOKEN \
+              sonarsource/sonar-scanner-cli:latest \
+              sonar-scanner \
+                -Dsonar.projectKey=sentiment-ai \
+                -Dsonar.projectName=SentimentAI \
+                -Dsonar.sources=src \
+                -Dsonar.python.version=3.11 \
+                -Dsonar.python.coverage.reportPaths=coverage.xml \
+                -Dsonar.sourceEncoding=UTF-8
+          '''
+        }
+      }
+    }
+
     stage('Push to GHCR') {
       steps {
         withCredentials([usernamePassword(
