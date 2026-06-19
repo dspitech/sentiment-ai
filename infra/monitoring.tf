@@ -1,7 +1,3 @@
-data "docker_network" "cicd" {
-  name = "cicd-network"
-}
-
 resource "docker_image" "prometheus" {
   name         = "prom/prometheus:latest"
   keep_locally = true
