@@ -35,17 +35,18 @@ SCRIPT_EOF
             chmod +x deploy.sh
             docker build -t terraform-deploy -f- . <<DOCKERFILE
 FROM hashicorp/terraform:latest
-COPY infra/       /terraform/
-COPY monitoring/  /monitoring/
-COPY deploy.sh    /terraform/
+RUN apk add --no-cache docker-cli
+COPY infra/      /terraform/
+COPY monitoring/ /monitoring/
+COPY deploy.sh   /terraform/
 RUN rm -f /terraform/terraform.tfstate /terraform/terraform.tfstate.backup /terraform/.terraform.lock.hcl
 WORKDIR /terraform
 DOCKERFILE
-            docker run --rm \
-              --entrypoint /bin/sh \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              -v \${HOME}/.aws:/root/.aws \
-              -e TF_VAR_image_tag=${IMAGE_TAG} \
+            docker run --rm \\
+              --entrypoint /bin/sh \\
+              -v /var/run/docker.sock:/var/run/docker.sock \\
+              -v \${HOME}/.aws:/root/.aws \\
+              -e TF_VAR_image_tag=${IMAGE_TAG} \\
               terraform-deploy /terraform/deploy.sh
           """
         }
