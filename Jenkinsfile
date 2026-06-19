@@ -79,11 +79,12 @@ pipeline {
     stage('SonarQube Analysis & Quality Gate') {
       environment {
         SONARQUBE_TOKEN = credentials('sonar-token')
+        SONAR_HOST_URL  = 'http://4.223.165.64:9000/'
       }
 
       steps {
         sh '''
-          # 1. On lance l'analyse SonarQube
+          # 1. On lance l'analyse SonarQube avec l'URL explicitement définie
           docker run --rm \
             --user root \
             -v $WORKSPACE:/usr/src \
@@ -100,7 +101,7 @@ pipeline {
               -Dsonar.python.coverage.reportPaths=coverage.xml \
               -Dsonar.sourceEncoding=UTF-8
 
-          # 2. On interroge directement l'API de SonarQube pour obtenir le statut réel du Quality Gate
+          # 2. On attend 5 secondes et on interroge l'API de SonarQube pour le Quality Gate
           echo "Vérification du Quality Gate via l'API..."
           sleep 5
           STATUS=$(curl -s -u "${SONARQUBE_TOKEN}:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
