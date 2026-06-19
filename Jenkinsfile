@@ -56,7 +56,9 @@ DOCKERFILE
           curl -s http://${DOCKER_HOST_IP}:8001/metrics | grep -q sentiment_predictions_total || exit 1
           echo "/metrics OK"
           sleep 20
-          curl -s "http://${DOCKER_HOST_IP}:9090/api/v1/query?query=up{job='sentiment-ai'}" | grep -q '"value":.*1' || exit 1
+          PROM_RESULT=$(curl -s "http://${DOCKER_HOST_IP}:9090/api/v1/query?query=up%7Bjob%3D%27sentiment-ai%27%7D")
+          echo "Prometheus response: $PROM_RESULT"
+          echo "$PROM_RESULT" | grep -q '"value"' || exit 1
           echo "Prometheus scrape OK"
           curl -f http://${DOCKER_HOST_IP}:3000/api/health || exit 1
           echo "Smoke Test OK : Tous les services sont opérationnels."
