@@ -83,7 +83,6 @@ pipeline {
 
       steps {
         withSonarQubeEnv(installationName: 'sonarqube') {
-          // 1. Lancement de l'analyse dans le conteneur
           sh '''
             docker run --rm \
               -v $WORKSPACE:/usr/src \
@@ -95,13 +94,13 @@ pipeline {
                 -Dsonar.projectKey=sentiment-ai \
                 -Dsonar.projectName=SentimentAI \
                 -Dsonar.projectBaseDir=/usr/src \
+                -Dsonar.working.directory=/usr/src/.scannerwork \
                 -Dsonar.sources=. \
                 -Dsonar.python.version=3.11 \
                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                 -Dsonar.sourceEncoding=UTF-8
           '''
           
-          // 2. On attend le verdict de SonarQube au sein du même wrapper pour préserver le contexte
           timeout(time: 15, unit: 'MINUTES') {
             waitForQualityGate abortPipeline: true
           }
