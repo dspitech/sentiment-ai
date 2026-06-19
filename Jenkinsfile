@@ -95,6 +95,7 @@ pipeline {
                 -Dsonar.projectKey=sentiment-ai \
                 -Dsonar.projectName=SentimentAI \
                 -Dsonar.projectBaseDir=/usr/src \
+                -Dsonar.working.directory=/usr/src/.scannerwork \
                 -Dsonar.sources=. \
                 -Dsonar.python.version=3.11 \
                 -Dsonar.python.coverage.reportPaths=coverage.xml \
