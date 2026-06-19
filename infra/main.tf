@@ -13,7 +13,7 @@ provider "docker" {
 }
 
 data "docker_network" "cicd" {
-  name = "cicd-network"
+  name = "cicd"
 }
 
 resource "docker_image" "sentiment" {
