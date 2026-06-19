@@ -82,7 +82,8 @@ pipeline {
       }
 
       steps {
-        withSonarQubeEnv() {
+        // Syntaxe explicite requise par votre version du plugin
+        withSonarQubeEnv(installationName: 'sonarqube') {
           sh '''
             docker run --rm \
               -v $WORKSPACE:/usr/src \
