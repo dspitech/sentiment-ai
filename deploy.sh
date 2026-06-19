@@ -1,8 +1,4 @@
 #!/bin/sh
-for container in sentiment-staging prometheus grafana; do
-    if docker ps -aq -f name="^${container}$" | grep -q .; then
-        docker rm -f "${container}"
-    fi
-done
+docker rm -f sentiment-staging prometheus grafana 2>/dev/null || true
 terraform init -upgrade
 terraform apply -auto-approve
