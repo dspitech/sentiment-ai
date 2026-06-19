@@ -25,7 +25,10 @@ pipeline {
         script {
           sh """
             docker build -t terraform-deploy -f Dockerfile.terraform .
-            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy sh -c "terraform init -upgrade && terraform apply -auto-approve"
+            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy /bin/sh -s <<'END_TF'
+              terraform init -upgrade
+              terraform apply -auto-approve
+END_TF
           """
         }
       }
