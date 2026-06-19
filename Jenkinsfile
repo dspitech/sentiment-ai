@@ -24,11 +24,8 @@ pipeline {
       steps {
         script {
           sh """
-            # Utilise le Dockerfile présent à la racine
             docker build -t terraform-deploy -f Dockerfile.terraform .
-            
-            # Exécution
-            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy init
+            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy init -reconfigure
             docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy apply -auto-approve
           """
         }

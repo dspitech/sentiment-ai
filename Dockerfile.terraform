@@ -1,6 +1,4 @@
 FROM hashicorp/terraform:latest
-# On copie tout le dossier infra
 COPY infra/ /terraform/
-# On supprime les fichiers d'état pour éviter les conflits et les risques de sécurité
-RUN rm -f /terraform/terraform.tfstate /terraform/terraform.tfstate.backup
+RUN rm -f /terraform/terraform.tfstate /terraform/terraform.tfstate.backup /terraform/.terraform.lock.hcl
 WORKDIR /terraform
