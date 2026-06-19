@@ -84,9 +84,12 @@ pipeline {
       steps {
         withSonarQubeEnv(installationName: 'sonarqube') {
           sh '''
-            # 1. Exécution du scanner en root
+            # Nettoyage préventif des anciens fichiers créés par root
+            docker run --rm --user root -v $WORKSPACE:/usr/src sonarsource/sonar-scanner-cli:latest rm -rf /usr/src/.scannerwork
+
+            # Exécution avec les IDs (UID:GID) exacts de l'utilisateur Jenkins courant
             docker run --rm \
-              --user root \
+              --user $(id -u):$(id -g) \
               -v $WORKSPACE:/usr/src \
               -w /usr/src \
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
@@ -101,9 +104,6 @@ pipeline {
                 -Dsonar.python.version=3.11 \
                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                 -Dsonar.sourceEncoding=UTF-8
-
-            # 2. Correctif de droits : On réattribue le dossier à l'utilisateur courant de Jenkins
-            sudo chown -R $(id -u):$(id -g) $WORKSPACE/.scannerwork || docker run --rm -v $WORKSPACE:/usr/src sonarsource/sonar-scanner-cli:latest chown -R 1000:1000 /usr/src/.scannerwork || true
           '''
           
           timeout(time: 15, unit: 'MINUTES') {
