@@ -18,13 +18,13 @@ resource "docker_container" "prometheus" {
   }
 
   volumes {
-    host_path      = "/monitoring/prometheus.yml"
+    host_path      = "/home/labadmin/sentiment-ai/monitoring/prometheus.yml"
     container_path = "/etc/prometheus/prometheus.yml"
     read_only      = true
   }
 
   volumes {
-    host_path      = "/monitoring/alerts.yml"
+    host_path      = "/home/labadmin/sentiment-ai/monitoring/alerts.yml"
     container_path = "/etc/prometheus/alerts.yml"
     read_only      = true
   }
