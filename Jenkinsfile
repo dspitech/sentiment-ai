@@ -1,33 +1,88 @@
 pipeline {
-    agent any
-    environment {
-        SONAR_SCANNER_HOME = "/opt/sonar-scanner"
+  agent any
+
+  environment {
+    IMAGE_NAME = 'sentiment-ai'
+    REGISTRY   = 'ghcr.io/dspitech'
+    REGISTRY_IMAGE = "${REGISTRY}/${IMAGE_NAME}"
+    SONAR_HOST_URL = 'http://4.223.165.64:9000/'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script { env.IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim() }
+      }
     }
-    stages {
-        stage('Install SonarScanner') {
-            steps {
-                sh '''
-                if [ ! -d "/opt/sonar-scanner" ]; then
-                    sudo mkdir -p /opt/sonar-scanner
-                    sudo wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip -O /tmp/sonar.zip
-                    sudo unzip -q /tmp/sonar.zip -d /opt/
-                    sudo mv /opt/sonar-scanner-5.0.1.3006-linux/* /opt/sonar-scanner/
-                fi
-                '''
-            }
-        }
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonarqube') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        // Scan direct (plus de Docker, donc plus de problème de permissions)
-                        sh "/opt/sonar-scanner/bin/sonar-scanner -Dsonar.projectKey=sentiment-ai-new -Dsonar.sources=. -Dsonar.host.url=\$SONAR_HOST_URL -Dsonar.login=${SONAR_TOKEN}"
-                    }
-                }
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
+
+    stage('Lint') {
+      steps {
+        sh 'docker run --rm -v $WORKSPACE:/app -w /app python:3.12-slim sh -c "pip install flake8 -q && flake8 ."'
+      }
     }
+
+    stage('Build & Test') {
+      steps {
+        sh '''
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+          docker rm -f test-runner 2>/dev/null || true
+          docker run --name test-runner ${IMAGE_NAME}:${IMAGE_TAG} pytest tests/ -v --cov=src --cov-report=xml:/tmp/coverage.xml --cov-fail-under=70
+          docker cp test-runner:/tmp/coverage.xml ./coverage.xml 2>/dev/null || true
+          docker rm -f test-runner 2>/dev/null || true
+        '''
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      environment { SONARQUBE_TOKEN = credentials('sonar-token') }
+      steps {
+        sh '''
+          if [ ! -d "$HOME/.sonar/sonar-scanner-5.0.1.3006-linux" ]; then
+            mkdir -p $HOME/.sonar
+            curl -sSLo $HOME/.sonar/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+            unzip -q -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+          fi
+          $HOME/.sonar/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONARQUBE_TOKEN -Dsonar.projectKey=sentiment-ai -Dsonar.sources=src -Dsonar.python.coverage.reportPaths=coverage.xml
+          sleep 5
+          STATUS=$(curl -s -u "${SONARQUBE_TOKEN}:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+          if [ "$STATUS" = "ERROR" ]; then echo "Quality Gate échoué !"; exit 1; fi
+        '''
+      }
+    }
+
+    stage('Push to GHCR') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'G_USER', passwordVariable: 'G_TOKEN')]) {
+          sh '''
+            echo $G_TOKEN | docker login ghcr.io -u $G_USER --password-stdin
+            docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_IMAGE}:${IMAGE_TAG}
+            docker push ${REGISTRY_IMAGE}:${IMAGE_TAG}
+          '''
+        }
+      }
+    }
+
+    stage('Terraform Apply') {
+      when { branch 'main' }
+      steps {
+        dir('infra') {
+          // Utilisation du conteneur Terraform officiel pour éviter d'installer TF sur l'agent
+          sh '''
+            docker run --rm -v $(pwd):/terraform -w /terraform \
+              -e TF_VAR_image_tag=${IMAGE_TAG} \
+              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+              hashicorp/terraform:latest init
+              
+            docker run --rm -v $(pwd):/terraform -w /terraform \
+              -e TF_VAR_image_tag=${IMAGE_TAG} \
+              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+              hashicorp/terraform:latest apply -auto-approve
+          '''
+        }
+      }
+    }
+  }
 }
