@@ -115,6 +115,26 @@ pipeline {
       }
     }
 
+    stage('Security Scan') {
+      steps {
+        sh '''
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v trivy-cache:/root/.cache/trivy \
+            aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --format table \
+        ''' + "${IMAGE_NAME}:${IMAGE_TAG}"
+      }
+      post {
+        failure {
+          echo 'Vulnérabilités CRITICAL ou HIGH détectées !'
+          echo 'Corrigez les dépendances avant de déployer.'
+        }
+      }
+    }
+
     stage('Push to GHCR') {
       steps {
         withCredentials([usernamePassword(
