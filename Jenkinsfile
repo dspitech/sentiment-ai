@@ -103,6 +103,15 @@ pipeline {
       }
     }
 
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 15, unit: 'MINUTES') {
+          // Attend le résultat asynchrone du Quality Gate SonarQube via webhook
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+
     stage('Push to GHCR') {
       steps {
         withCredentials([usernamePassword(
