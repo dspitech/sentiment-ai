@@ -45,28 +45,28 @@ DOCKERFILE
     }
 
     stage('11. Smoke Test') {
-        when { branch 'main' }
-        steps {
-            sh '''
-                echo "Attente démarrage (10s)..."
-                sleep 10
-                curl -f http://localhost:8001/health || exit 1
-                echo "/health OK"
-                curl -s http://localhost:8001/metrics | grep -q sentiment_predictions_total || exit 1
-                echo "/metrics OK"
-                sleep 20
-                curl -s "http://localhost:9090/api/v1/query?query=up{job='sentiment-ai'}" | grep -q '"value":.*1' || exit 1
-                echo "Prometheus scrape OK"
-                curl -f http://localhost:3000/api/health || exit 1
-                echo "Smoke Test OK : Tous les services sont opérationnels."
-            '''
+      when { expression { env.GIT_BRANCH ==~ /.*main/ } }
+      steps {
+        sh '''
+          echo "Attente démarrage (10s)..."
+          sleep 10
+          curl -f http://localhost:8001/health || exit 1
+          echo "/health OK"
+          curl -s http://localhost:8001/metrics | grep -q sentiment_predictions_total || exit 1
+          echo "/metrics OK"
+          sleep 20
+          curl -s "http://localhost:9090/api/v1/query?query=up{job='sentiment-ai'}" | grep -q '"value":.*1' || exit 1
+          echo "Prometheus scrape OK"
+          curl -f http://localhost:3000/api/health || exit 1
+          echo "Smoke Test OK : Tous les services sont opérationnels."
+        '''
+      }
+      post {
+        failure {
+          sh 'docker logs prometheus || true'
+          sh 'docker logs sentiment-staging || true'
         }
-        post {
-            failure {
-                sh 'docker logs prometheus || true'
-                sh 'docker logs sentiment-staging || true'
-            }
-        }
+      }
     }
   }
 }
