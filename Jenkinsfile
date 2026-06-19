@@ -84,7 +84,8 @@ pipeline {
 
       steps {
         sh '''
-          # On cible précisément le dossier src pour l'analyse du code
+          # On laisse le scanner chercher à la racine du montage
+          # mais on ajuste l'analyse sur le dossier courant complet (.)
           docker run --rm \
             --user root \
             -v $WORKSPACE:/usr/src \
@@ -96,7 +97,8 @@ pipeline {
               -Dsonar.projectKey=sentiment-ai \
               -Dsonar.projectName=SentimentAI \
               -Dsonar.projectBaseDir=/usr/src \
-              -Dsonar.sources=src \
+              -Dsonar.sources=. \
+              -Dsonar.exclusions=**/tests/**,**/venv/**,**/.scannerwork/** \
               -Dsonar.python.version=3.11 \
               -Dsonar.python.coverage.reportPaths=coverage.xml \
               -Dsonar.sourceEncoding=UTF-8
