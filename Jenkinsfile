@@ -19,12 +19,11 @@ pipeline {
     stage('7. Sonar Analysis') { steps { sh '$HOME/.sonar/bin/sonar-scanner -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_USER_TOKEN -Dsonar.projectKey=sentiment-ai -Dsonar.sources=src -Dsonar.python.coverage.reportPaths=coverage.xml' } }
     stage('8. Quality Gate') { steps { sh 'STATUS=$(curl -s -u "$SONAR_USER_TOKEN:" "${SONAR_HOST_URL}api/qualitygates/project_status?projectKey=sentiment-ai" | grep -o \'"status":"[^"]*"\'); if [ "$STATUS" = \'"status":"ERROR"\' ]; then exit 1; fi' } }
     stage('9. Push Image') { steps { sh 'docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_IMAGE}:${IMAGE_TAG} && docker push ${REGISTRY_IMAGE}:${IMAGE_TAG}' } }
-    
+
     stage('10. Deploy Terraform') {
       steps {
         script {
           sh """
-            # Création du script de déploiement à la volée
             cat > deploy.sh << 'SCRIPT_EOF'
 #!/bin/sh
 terraform init -upgrade
@@ -32,7 +31,6 @@ terraform apply -auto-approve
 SCRIPT_EOF
             chmod +x deploy.sh
 
-            # Construction de l'image dynamique (inclut le script et nettoie les états)
             docker build -t terraform-deploy -f- . <<DOCKERFILE
 FROM hashicorp/terraform:latest
 COPY infra/ /terraform/
@@ -41,8 +39,11 @@ RUN rm -f /terraform/terraform.tfstate /terraform/terraform.tfstate.backup /terr
 WORKDIR /terraform
 DOCKERFILE
 
-            # Exécution propre
-            docker run --rm -v \${HOME}/.aws:/root/.aws -e TF_VAR_image_tag=${IMAGE_TAG} terraform-deploy ./deploy.sh
+            docker run --rm \\
+              --entrypoint /bin/sh \\
+              -v \${HOME}/.aws:/root/.aws \\
+              -e TF_VAR_image_tag=${IMAGE_TAG} \\
+              terraform-deploy /terraform/deploy.sh
           """
         }
       }
